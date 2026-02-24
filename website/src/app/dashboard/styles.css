@@ -1,0 +1,75 @@
+.ok {
+    display: flex;
+    justify-content: center;
+    padding-right: 12rem;
+}
+
+.ok1 {
+    display: flex;
+    flex-direction: column;
+    margin-left: -150px;
+}
+
+.ok1 img {
+    width: 11rem;
+    height: 11rem;
+    border-radius: .9em;
+}
+
+.diet {
+    margin-top: 5rem;
+}
+
+.fitness {
+    margin-top: 1rem;
+}
+
+.fitness:hover {
+    background-color: rgb(40, 40, 40);
+}
+
+.heart {
+    width: 52vh;
+    height: 53vh;
+    margin-top: 5rem;
+    margin-left: 3rem;
+    border-radius: .9em;
+}
+
+.risk-factor {
+    width: 15rem;
+    height: 54vh;
+    color:rgb(0, 0, 0);
+    font-weight: 900;
+    background-color: rgb(60, 60, 60);
+    margin: 5rem 200px;
+    border-radius: .9em;
+}
+
+.risk-factor header {
+    font-size: x-large;
+}
+
+.factor {
+    color: black;
+    font-weight: 500;
+    font-size: large;
+    margin-top: 15px;
+}
+
+header {
+    text-align: center;
+    padding-top: 10px; 
+}
+
+.factor li {
+    padding: 8px 16px;
+}
+
+.pb {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
