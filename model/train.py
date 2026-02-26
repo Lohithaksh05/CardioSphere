@@ -3,7 +3,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score, accuracy_score, log_loss
 
-data = pd.read_csv('data.csv')
+data = pd.read_csv('data.csv', skipinitialspace=True)
 
 X = data.drop(columns=['HeartDiseaseorAttack','Education','Income','NoDocbcCost','AnyHealthcare','MentHlth','PhysHlth'])
 y = data['HeartDiseaseorAttack']

@@ -1,24 +1,43 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS  # Import the CORS extension
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List
 import joblib
+import uvicorn
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+app = FastAPI(title="CardioSphere Prediction API", version="1.0.0")
 
-# Load the trained model
+# Enable CORS for all origins (same behaviour as Flask-Cors default)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Load the trained model once at startup
 loaded_model = joblib.load('heart_disease_model.pkl')
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    # Get the feature values from the JSON payload
-    feature_values = request.get_json()['data']
-    print(feature_values)
-    
-    # Make predictions using the loaded model
-    probability = loaded_model.predict_proba([feature_values])[:, 1]
 
-    # Return the predicted probability as JSON
-    return jsonify({'probability': probability[0]})
+class PredictRequest(BaseModel):
+    data: List[float]
+
+
+@app.get("/")
+def health_check():
+    return {"status": "CardioSphere API is running"}
+
+
+@app.post("/predict")
+def predict(payload: PredictRequest):
+    try:
+        print(payload.data)
+        probability = loaded_model.predict_proba([payload.data])[:, 1]
+        return {"probability": float(probability[0])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=5000, reload=True)
