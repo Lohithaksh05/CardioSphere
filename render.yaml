@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: cardiosphere-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGODB_URL
+        sync: false          # set manually in Render dashboard
+      - key: DATABASE_NAME
+        value: cardiosphere
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_JWKS_URL
+        sync: false
+      - key: CLERK_ISSUER
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: APP_ENV
+        value: production
+      - key: CORS_ORIGINS
+        sync: false          # set to your Vercel frontend URL e.g. https://cardiosphere.vercel.app
