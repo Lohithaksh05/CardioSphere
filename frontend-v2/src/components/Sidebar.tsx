@@ -17,6 +17,7 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  MapPin,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,13 @@ const navItems = [
     label: "Community",
     icon: Users,
     gradient: "from-amber-500 to-orange-500",
+    glow: "shadow-glow-rose",
+  },
+  {
+    href: "/hospitals",
+    label: "Nearby Hospitals",
+    icon: MapPin,
+    gradient: "from-rose-500 to-red-500",
     glow: "shadow-glow-rose",
   },
 ];

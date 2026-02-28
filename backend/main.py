@@ -18,6 +18,7 @@ from routes.ai_planner import router as ai_planner_router
 from routes.medication import router as medication_router
 from routes.dashboard import router as dashboard_router
 from routes.community import router as community_router
+from routes.hospitals import router as hospitals_router
 from services.scheduler_service import scheduler, reschedule_all_on_startup
 
 settings = get_settings()
@@ -63,6 +64,7 @@ app.include_router(ai_planner_router, prefix=PREFIX)
 app.include_router(medication_router, prefix=PREFIX)
 app.include_router(dashboard_router, prefix=PREFIX)
 app.include_router(community_router, prefix=PREFIX)
+app.include_router(hospitals_router, prefix=PREFIX)
 
 
 @app.get("/")

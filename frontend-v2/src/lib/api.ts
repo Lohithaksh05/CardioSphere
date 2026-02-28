@@ -153,4 +153,11 @@ export const toggleLike = (postId: string) =>
 export const deletePost = (postId: string) =>
   api.delete(`/community/${postId}`);
 
+// ---------- Hospitals ----------
+export const getNearbyHospitals = (
+  lat: number,
+  lng: number,
+  radius = 5000
+) => api.get(`/hospitals/nearby?lat=${lat}&lng=${lng}&radius=${radius}`);
+
 export default api;
