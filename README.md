@@ -10,7 +10,7 @@ Full-stack application for heart disease risk prediction, AI-personalized fitnes
 | Backend | FastAPI (Python), Motor (async MongoDB), Pydantic v2 |
 | Auth | Clerk v6 (frontend + JWT verification on backend) |
 | ML | scikit-learn RandomForest, joblib |
-| AI | OpenAI GPT-3.5-turbo (workout/diet/recommendations) |
+| AI | OpenAI GPT-4o-mini (workout/diet/recommendations) |
 | Database | MongoDB (Atlas or local) |
 | SMS | Twilio + APScheduler (medication reminders) |
 | Containerization | Docker + Docker Compose |
