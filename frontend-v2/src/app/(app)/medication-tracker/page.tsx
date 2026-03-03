@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Pill, Plus, Check, Clock, Trash2, Loader2, X, RotateCcw, Bell, BellOff,
   CalendarDays, Flame, SkipForward, Heart, Droplets, Activity, Zap, Sparkles,
-  Phone, Pencil,
+  Phone, Pencil, Camera, Upload, FileText, ChevronDown, ChevronUp,
 } from "lucide-react";
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -19,7 +19,7 @@ import TimeWheelPicker from "@/components/TimeWheelPicker";
 import {
   getMedications, addMedication, markMedicationTaken, skipMedication,
   resetMedication, deleteMedication, toggleMedicationSMS,
-  getProfile, updateProfile, updateMedication,
+  getProfile, updateProfile, updateMedication, scanPrescription,
 } from "@/lib/api";
 
 /* ---------- constants ---------- */
@@ -89,6 +89,16 @@ export default function MedicationTrackerPage() {
   const [editShowTimePicker, setEditShowTimePicker] = useState<number | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  // prescription scan state
+  const [showScan, setShowScan] = useState(false);
+  const [scanFile, setScanFile] = useState<File | null>(null);
+  const [scanPreview, setScanPreview] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<any[] | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [expandedScanIdx, setExpandedScanIdx] = useState<number | null>(null);
+  const [addingScanMeds, setAddingScanMeds] = useState(false);
+
   // form state
   const [form, setForm] = useState({
     medication_name: "", dosage: "", dosage_unit: "mg", category: "general",
@@ -138,6 +148,86 @@ export default function MedicationTrackerPage() {
     if (enabled && !userPhone) return;
     setSmsLoading(id);
     try { await toggleMedicationSMS(id, { enabled }); await fetchMeds(); } catch (err) { console.error(err); } finally { setSmsLoading(null); }
+  };
+
+  /* ---- prescription scan handlers ---- */
+  const handleScanFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setScanFile(f);
+    setScanPreview(URL.createObjectURL(f));
+    setScanResult(null);
+    setScanError(null);
+  };
+
+  const handleScanUpload = async () => {
+    if (!scanFile) return;
+    setScanning(true);
+    setScanError(null);
+    setScanResult(null);
+    try {
+      const res = await scanPrescription(scanFile);
+      setScanResult(res.data.medications || []);
+    } catch (err: any) {
+      setScanError(err?.response?.data?.detail ?? "Scan failed. Try a clearer image.");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleAddAllScanned = async () => {
+    if (!scanResult || scanResult.length === 0) return;
+    setAddingScanMeds(true);
+    try {
+      for (const med of scanResult) {
+        await addMedication({
+          medication_name: med.medication_name,
+          dosage: String(med.dosage),
+          dosage_unit: med.dosage_unit || "mg",
+          time_schedule: med.time_schedule || ["08:00"],
+          frequency: med.frequency || "daily",
+          specific_days: med.specific_days || [],
+          start_date: med.start_date || new Date().toISOString().split("T")[0],
+          end_date: med.end_date || null,
+          category: med.category || "general",
+          notes: med.notes || "",
+          sms_reminders_enabled: false,
+        });
+      }
+      await fetchMeds();
+      // reset scan UI
+      setShowScan(false);
+      setScanFile(null);
+      setScanPreview(null);
+      setScanResult(null);
+    } catch (err) {
+      console.error("Failed to add scanned medications:", err);
+    } finally {
+      setAddingScanMeds(false);
+    }
+  };
+
+  const handleAddSingleScanned = async (med: any, idx: number) => {
+    try {
+      await addMedication({
+        medication_name: med.medication_name,
+        dosage: String(med.dosage),
+        dosage_unit: med.dosage_unit || "mg",
+        time_schedule: med.time_schedule || ["08:00"],
+        frequency: med.frequency || "daily",
+        specific_days: med.specific_days || [],
+        start_date: med.start_date || new Date().toISOString().split("T")[0],
+        end_date: med.end_date || null,
+        category: med.category || "general",
+        notes: med.notes || "",
+        sms_reminders_enabled: false,
+      });
+      await fetchMeds();
+      // remove from scan results
+      setScanResult((prev) => prev ? prev.filter((_, i) => i !== idx) : null);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const openEditModal = (med: any) => {
@@ -219,11 +309,18 @@ export default function MedicationTrackerPage() {
           <h1 className="text-3xl font-bold gradient-text-subtle">Medication Tracker</h1>
           <p className="text-muted-foreground mt-1">Manage your daily medications &amp; reminders</p>
         </div>
-        <Button onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }}
-          className={`gap-2 rounded-xl shadow-lg transition-all ${showForm ? "bg-gray-600 hover:bg-gray-700" : "bg-gradient-to-r from-violet-600 to-purple-600 shadow-violet-200/50"}`}>
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? "Cancel" : "Add Medication"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => { setShowScan(!showScan); if (!showScan) { setScanFile(null); setScanPreview(null); setScanResult(null); setScanError(null); } }}
+            className={`gap-2 rounded-xl shadow-lg transition-all ${showScan ? "bg-gray-600 hover:bg-gray-700" : "bg-gradient-to-r from-blue-600 to-cyan-600 shadow-blue-200/50"}`}>
+            {showScan ? <X className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+            {showScan ? "Cancel Scan" : "Scan Prescription"}
+          </Button>
+          <Button onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }}
+            className={`gap-2 rounded-xl shadow-lg transition-all ${showForm ? "bg-gray-600 hover:bg-gray-700" : "bg-gradient-to-r from-violet-600 to-purple-600 shadow-violet-200/50"}`}>
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showForm ? "Cancel" : "Add Medication"}
+          </Button>
+        </div>
       </div>
 
       <PhoneSetupBanner phone={userPhone} onSave={handleSavePhone} />
@@ -257,6 +354,282 @@ export default function MedicationTrackerPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* ======== SCAN PRESCRIPTION PANEL ======== */}
+      <AnimatePresence>
+        {showScan && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+            <Card className="glass-card rounded-2xl border-0 overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500" />
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600">
+                    <FileText className="h-4 w-4 text-white" />
+                  </div>
+                  Scan Prescription
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Upload a photo of your prescription and we&apos;ll automatically extract all medications
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {/* Upload area */}
+                {!scanResult && (
+                  <div className="space-y-4">
+                    <label
+                      htmlFor="prescription-upload"
+                      className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
+                        scanPreview
+                          ? "border-blue-300 bg-blue-50/50"
+                          : "border-gray-300 hover:border-blue-400 hover:bg-blue-50/30"
+                      }`}
+                    >
+                      {scanPreview ? (
+                        <div className="relative w-full h-full flex items-center justify-center p-4">
+                          {scanFile?.type === "application/pdf" ? (
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-100 to-rose-100">
+                                <FileText className="h-8 w-8 text-red-500" />
+                              </div>
+                              <p className="text-sm font-semibold text-gray-700 text-center truncate max-w-[200px]">
+                                {scanFile.name}
+                              </p>
+                            </div>
+                          ) : (
+                            <img
+                              src={scanPreview}
+                              alt="Prescription preview"
+                              className="max-h-40 rounded-xl object-contain shadow-lg"
+                            />
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setScanFile(null);
+                              setScanPreview(null);
+                            }}
+                            className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-full hover:bg-red-50 transition shadow-sm"
+                          >
+                            <X className="h-4 w-4 text-red-500" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-cyan-100">
+                            <Upload className="h-7 w-7 text-blue-500" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-semibold text-gray-700">
+                              Click to upload prescription image
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              PDF, PNG, JPG, JPEG up to 10MB
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      <input
+                        id="prescription-upload"
+                        type="file"
+                        accept="image/*,application/pdf"
+                        className="hidden"
+                        onChange={handleScanFileChange}
+                      />
+                    </label>
+
+                    <Button
+                      onClick={handleScanUpload}
+                      disabled={!scanFile || scanning}
+                      className="gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl shadow-lg shadow-blue-200/50 w-full"
+                    >
+                      {scanning ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Analyzing prescription…
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="h-4 w-4" />
+                          Scan &amp; Extract Medications
+                        </>
+                      )}
+                    </Button>
+
+                    {scanError && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700"
+                      >
+                        {scanError}
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {/* Scan results */}
+                {scanResult && scanResult.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Check className="h-5 w-5 text-emerald-500" />
+                        <p className="font-semibold text-gray-900">
+                          Found {scanResult.length} medication{scanResult.length > 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleAddAllScanned}
+                        disabled={addingScanMeds}
+                        className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl shadow-lg shadow-emerald-200/50"
+                        size="sm"
+                      >
+                        {addingScanMeds ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="h-3.5 w-3.5" />
+                        )}
+                        Add All
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {scanResult.map((med, idx) => {
+                        const cat = CATEGORIES[med.category] || CATEGORIES.general;
+                        const CatIcon = cat.icon;
+                        const isExpanded = expandedScanIdx === idx;
+                        return (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.06 }}
+                            className="rounded-xl border border-gray-100 bg-white/80 overflow-hidden"
+                          >
+                            <div
+                              className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                              onClick={() => setExpandedScanIdx(isExpanded ? null : idx)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br ${cat.gradient} shadow-sm`}>
+                                  <CatIcon className="h-4 w-4 text-white" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-sm">{med.medication_name}</p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <Badge variant="secondary" className="text-[10px] rounded-lg">
+                                      {med.dosage} {med.dosage_unit}
+                                    </Badge>
+                                    <Badge className={`text-[10px] border-0 rounded-lg ${cat.color}`}>
+                                      {cat.label}
+                                    </Badge>
+                                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                      <Clock className="h-2.5 w-2.5" />
+                                      {(med.time_schedule || []).join(", ")}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  className="gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-xs rounded-xl shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddSingleScanned(med, idx);
+                                  }}
+                                >
+                                  <Plus className="h-3 w-3" /> Add
+                                </Button>
+                                {isExpanded ? (
+                                  <ChevronUp className="h-4 w-4 text-gray-400" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                                )}
+                              </div>
+                            </div>
+
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="border-t border-gray-100"
+                                >
+                                  <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                                    <div>
+                                      <p className="text-muted-foreground font-medium">Dosage</p>
+                                      <p className="font-semibold mt-0.5">
+                                        {med.dosage} {med.dosage_unit}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground font-medium">Frequency</p>
+                                      <p className="font-semibold mt-0.5 capitalize">{med.frequency}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground font-medium">Schedule</p>
+                                      <p className="font-semibold mt-0.5">
+                                        {(med.time_schedule || []).join(", ")}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground font-medium">Category</p>
+                                      <p className="font-semibold mt-0.5 capitalize">{med.category}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground font-medium">Start Date</p>
+                                      <p className="font-semibold mt-0.5">{med.start_date || "Today"}</p>
+                                    </div>
+                                    {med.notes && (
+                                      <div className="col-span-2 md:col-span-3">
+                                        <p className="text-muted-foreground font-medium">Notes</p>
+                                        <p className="font-semibold mt-0.5">{med.notes}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setScanResult(null);
+                          setScanFile(null);
+                          setScanPreview(null);
+                        }}
+                        className="flex-1 rounded-xl"
+                      >
+                        Scan Another
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {scanResult && scanResult.length === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-700 text-center"
+                  >
+                    No medications could be detected. Please try a clearer image.
+                  </motion.div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ======== ADD MEDICATION FORM ======== */}
       <AnimatePresence>

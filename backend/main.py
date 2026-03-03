@@ -3,6 +3,8 @@ CardioSphere Backend — FastAPI application entry point.
 Registers all routes, middleware, and lifecycle events.
 """
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -10,6 +12,13 @@ from contextlib import asynccontextmanager
 from config import get_settings
 from database import connect_db, close_db
 from services.ml_service import load_model
+
+# Configure logging so prescription_service logs appear in uvicorn output
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 # Import route modules
 from routes.auth import router as auth_router

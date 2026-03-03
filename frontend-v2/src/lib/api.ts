@@ -129,6 +129,14 @@ export const toggleMedicationSMS = (
   data: { enabled: boolean }
 ) => api.put(`/medications/${id}/toggle-sms`, data);
 
+export const scanPrescription = (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post("/medications/scan-prescription", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
 // ---------- Dashboard ----------
 export const getDashboardStats = () => api.get("/dashboard/stats");
 export const getRiskHistory = (limit = 20) =>

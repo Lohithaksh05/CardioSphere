@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str = ""
 
+    # Sarvam AI (Vision OCR for prescriptions)
+    SARVAM_API_KEY: str = ""
+
+    # Tavily (web search for medicine enrichment)
+    TAVILY_API_KEY: str = "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"
+
     # Twilio (SMS reminders)
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""

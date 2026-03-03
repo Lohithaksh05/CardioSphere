@@ -3,7 +3,7 @@ Medication routes — CRUD for medication reminders.
 Phone number is read from the user profile (not per-medication).
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from datetime import datetime, date
 from bson import ObjectId
 from database import get_db
@@ -321,3 +321,45 @@ async def toggle_sms_reminder(
         "enabled": data.enabled and bool(job_ids),
         "job_count": len(job_ids),
     }
+
+
+# ---------- Prescription Scan ----------
+
+@router.post("/scan-prescription")
+async def scan_prescription_endpoint(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    POST /medications/scan-prescription
+    Upload a prescription image → returns structured medication list.
+    Uses Sarvam AI for OCR and OpenAI for parsing / research.
+    """
+    if not file.content_type or not file.content_type.startswith(("image/", "application/pdf")):
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a PDF or image file (JPEG, PNG, etc.)",
+        )
+
+    # Read image bytes (limit ~10 MB)
+    image_bytes = await file.read()
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image too large. Max 10 MB.")
+
+    from services.prescription_service import scan_prescription
+
+    try:
+        medications = await scan_prescription(
+            image_bytes,
+            file.filename or "prescription",
+            file.content_type or "",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Prescription scan failed: {str(e)}",
+        )
+
+    return {"medications": medications}
