@@ -4,6 +4,7 @@ Only returns cardiology-tagged facilities or hospitals whose names indicate card
 No external API key required; uses the free Overpass turbo endpoint.
 """
 
+import asyncio
 import re
 import httpx
 import math
@@ -13,7 +14,13 @@ from fastapi import Depends
 
 router = APIRouter(prefix="/hospitals", tags=["Hospitals"])
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# Multiple Overpass API mirrors — tried in order until one succeeds
+OVERPASS_MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass.openstreetmap.ru/api/interpreter",
+]
 
 # ----------------------------------------------------------------------
 # Overpass QL — two passes in one request:
@@ -123,20 +130,35 @@ async def get_nearby_hospitals(
         radius=radius, lat=lat, lng=lng
     )
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(OVERPASS_URL, data={"data": query})
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Overpass API error: {e.response.status_code}",
-        )
-    except httpx.RequestError as e:
+    last_error: str = "Unknown error"
+    data: dict | None = None
+
+    async with httpx.AsyncClient(timeout=35.0) as client:
+        for mirror_url in OVERPASS_MIRRORS:
+            try:
+                resp = await client.post(mirror_url, data={"data": query})
+
+                # 429 = rate limited, 504 = mirror timeout — try next mirror
+                if resp.status_code in (429, 502, 503, 504):
+                    last_error = f"Mirror {mirror_url} returned {resp.status_code}"
+                    await asyncio.sleep(0.5)
+                    continue
+
+                resp.raise_for_status()
+                data = resp.json()
+                break  # success
+
+            except (httpx.RequestError, httpx.TimeoutException) as e:
+                last_error = f"Mirror {mirror_url} unreachable: {e}"
+                continue
+            except httpx.HTTPStatusError as e:
+                last_error = f"Mirror {mirror_url} HTTP {e.response.status_code}"
+                continue
+
+    if data is None:
         raise HTTPException(
             status_code=503,
-            detail=f"Could not reach map service: {str(e)}",
+            detail=f"All Overpass API mirrors failed. Last error: {last_error}",
         )
 
     hospitals = []
